@@ -1,21 +1,20 @@
 # Printed Text Scanner (PyTesseract + PyQt5)
 
-Simple GUI application to load images or capture frames from a webcam, draw a rectangular ROI, and extract printed text using Tesseract OCR.
+Lightweight GUI to load images or capture webcam frames, draw a rectangular ROI, and extract printed text using Tesseract OCR. The app is implemented in a single script, `test.py`, using PyQt5 for the interface and OpenCV + pytesseract for image processing and OCR.
 
-This repository contains a single script, `test.py`, which implements a PyQt5-based interface and uses OpenCV + pytesseract for image processing and OCR.
-
-**Features:**
-- Load images (PNG/JPG/BMP).
-- Start/stop webcam and capture frames.
-- Draw a rectangular ROI on the image to limit OCR to a region.
-- Run OCR and display recognized text in a side panel.
-- Show bounding boxes and text overlay on the image.
-- Save overlay image to disk.
+**Key features (as implemented in `test.py`):**
+- **Load images** (PNG/JPG/JPEG/BMP) using a file dialog. Uses `cv2.imdecode` + `numpy.fromfile` to support long/Unicode paths on Windows.
+- **Webcam support**: start/stop camera with `cv2.VideoCapture` and a `QTimer` to show live frames.
+- **Drawable ROI**: click-and-drag on the image to draw a rectangular ROI. The `ImageLabel` class converts between display and image coordinates so the ROI maps correctly to the underlying image.
+- **OCR with preprocessing**: selected region (or full image) is converted to grayscale, filtered with `cv2.bilateralFilter`, and binarized with `cv2.adaptiveThreshold` before calling Tesseract.
+- **Bounding boxes & overlays**: high-confidence OCR words are drawn as rectangles with text overlays on the image.
+- **Text output**: full OCR text is placed in the right-side text panel.
+- **Save overlay**: save the current overlay image to disk (PNG) using `cv2.imencode` and `tofile`.
 
 **Requirements:**
 - Python 3.8+
-- Tesseract OCR installed and available on PATH (or provide explicit path)
-- The following Python packages:
+- A Tesseract OCR binary installed (and available on PATH, or set manually)
+- Python packages:
   - `PyQt5`
   - `opencv-python`
   - `pillow`
@@ -29,15 +28,15 @@ python -m pip install --upgrade pip
 pip install PyQt5 opencv-python pillow pytesseract numpy
 ```
 
-If you prefer a `requirements.txt`, create one with these packages and run:
+Or create a `requirements.txt` and run:
 
 ```powershell
 pip install -r requirements.txt
 ```
 
-**Tesseract installation (Windows):**
-- Install Tesseract (for example from the UB Mannheim builds) and ensure `tesseract.exe` is in your PATH.
-- If Tesseract is not on PATH, set the path in code before calling pytesseract functions, for example near the top of `test.py`:
+**Tesseract on Windows:**
+- Install Tesseract (e.g. UB Mannheim build) and ensure `tesseract.exe` is on your PATH.
+- If Tesseract isn't on PATH, set it in `test.py` before calls to `pytesseract`:
 
 ```python
 import pytesseract
@@ -50,27 +49,33 @@ pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tessera
 python test.py
 ```
 
-Then use the GUI: Load an image or start the camera, draw a rectangle over the region you want to scan, then click "Run OCR". Recognized text will appear in the right-side text area and high-confidence words will be overlaid on the image.
+Usage flow in the GUI:
+- Click `Load Image` or `Start Camera` to get an image into the viewer.
+- Draw a rectangle by dragging with the left mouse button to define an ROI (optional).
+- Click `Capture Frame` to mark the current frame (shows a confirmation message).
+- Click `Run OCR` to run preprocessing + Tesseract on the ROI or full image.
+- OCR results appear in the right-side text area; high-confidence words are overlaid on the image.
+- Click `Save Overlay` to export the displayed image with overlays as a PNG.
 
-**Notes & Tips:**
-- The script pre-processes the selected region with bilateral filtering and adaptive thresholding to improve OCR accuracy for printed text.
-- The OCR boxes filter by confidence (>40). Adjust the threshold in `test.py` if you want to include lower-confidence results.
-- On Windows, OpenCV's `cv2.imdecode` is used to support Unicode paths; avoid using non-ASCII characters if you run into file-open issues.
+**Implementation / behavior notes (from the code):**
+- ROI mapping: `ImageLabel` computes scaling between the pixmap and the label size. The ROI saved in image coordinates so overlays and OCR operate on the correct pixels.
+- Preprocessing pipeline (in `run_ocr`): grayscale -> bilateral filter -> adaptive Gaussian thresholding. Output of preprocessing is passed to Tesseract via Pillow image conversion.
+- OCR box filtering: the OCR output uses `pytesseract.image_to_data` and filters words by confidence `> 40` (integer-conf). Change this value in `test.py` to relax or tighten filtering.
+- Saving images: `display_image` is kept as RGB; when saving the code converts to BGR and writes via `cv2.imencode(...).tofile(path)` to support Unicode/long paths on Windows.
+
+**Troubleshooting & tips:**
+- If images fail to load, confirm the path has read permissions and contains supported formats. Using non-ASCII characters in file paths is supported by the current `cv2.imdecode` approach but may still cause issues in some environments.
+- If OCR returns nothing or poor text, try:
+  - Increasing image contrast or experimenting with different preprocessing (e.g., denoising, resizing).
+  - Lowering the confidence threshold in the code to see more raw detections.
+  - Installing language packs for Tesseract if you expect non-English text.
 
 **Where the code lives:**
 - Main GUI and OCR logic: `test.py`
 
-**Contributing:**
-- This is a small personal tool. If you'd like improvements (extra preprocessing, layout changes, exporting results), open an issue or send a patch.
+**Next steps I can help with:**
+- Add a `requirements.txt` and a small `run.ps1` helper script. 
+- Update `test.py` to auto-detect Tesseract and set `pytesseract.pytesseract.tesseract_cmd` when missing (with a helpful UI message).
+- Add a command-line mode to run OCR headless on images or directories.
 
-**License:**
-- No license file included. Add a `LICENSE` if you want to make reuse terms explicit.
-
----
-
-If you want, I can:
-- Add a `requirements.txt` and a small `run.ps1` helper script.
-- Update `test.py` to set `pytesseract.pytesseract.tesseract_cmd` automatically when missing.
-- Tweak the README wording or add screenshots.
-
-Tell me which of those you'd like next.
+If you want any of those, tell me which and I will implement it.
